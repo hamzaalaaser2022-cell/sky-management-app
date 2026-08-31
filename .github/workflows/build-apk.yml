@@ -1,0 +1,280 @@
+name: Build Hamza Management APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Create Android application
+        run: |
+          mkdir -p app/src/main/java/com/hamza/management
+          mkdir -p app/src/main/assets
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle.kts <<'GRADLE'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "HamzaManagement"
+          include(":app")
+          GRADLE
+
+          cat > build.gradle.kts <<'GRADLE'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+          }
+          GRADLE
+
+          cat > app/build.gradle.kts <<'GRADLE'
+          plugins { id("com.android.application") }
+
+          android {
+              namespace = "com.hamza.management"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.hamza.management"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+          }
+          GRADLE
+
+          cat > app/src/main/AndroidManifest.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="برنامج إدارة حمزة"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="portrait"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          XML
+
+          cat > app/src/main/res/values/styles.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#D6A94F</item>
+                  <item name="android:navigationBarColor">#173D68</item>
+                  <item name="android:statusBarColor">#173D68</item>
+                  <item name="android:windowLightStatusBar">false</item>
+              </style>
+          </resources>
+          XML
+
+          cat > app/src/main/res/drawable/ic_launcher.xml <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#173D68" android:pathData="M0,0h108v108h-108z"/>
+              <path android:fillColor="#D6A94F" android:pathData="M20,30h68v48h-68z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M27,38h54v8h-54zM27,52h35v7h-35zM27,65h45v7h-45z"/>
+          </vector>
+          XML
+
+          cat > app/src/main/java/com/hamza/management/MainActivity.java <<'JAVA'
+          package com.hamza.management;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.print.PrintAttributes;
+          import android.print.PrintManager;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
+              @Override public void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  webView = new WebView(this);
+                  setContentView(webView);
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setBuiltInZoomControls(false);
+                  settings.setDisplayZoomControls(false);
+                  webView.addJavascriptInterface(new Bridge(), "Android");
+                  webView.setWebChromeClient(new WebChromeClient());
+                  webView.setWebViewClient(new WebViewClient() {
+                      @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                          Uri uri = request.getUrl();
+                          if ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) {
+                              try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
+                              catch (Exception ignored) {}
+                              return true;
+                          }
+                          return false;
+                      }
+                  });
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              public class Bridge {
+                  @JavascriptInterface public void printPage() {
+                      runOnUiThread(() -> {
+                          PrintManager manager = (PrintManager) getSystemService(PRINT_SERVICE);
+                          manager.print("فاتورة إدارة حمزة",
+                              webView.createPrintDocumentAdapter("فاتورة إدارة حمزة"),
+                              new PrintAttributes.Builder().build());
+                      });
+                  }
+
+                  @JavascriptInterface public void shareText(String text) {
+                      runOnUiThread(() -> {
+                          Intent send = new Intent(Intent.ACTION_SEND);
+                          send.setType("text/plain");
+                          send.putExtra(Intent.EXTRA_TEXT, text);
+                          startActivity(Intent.createChooser(send, "مشاركة النسخة الاحتياطية"));
+                      });
+                  }
+              }
+
+              @Override public void onBackPressed() {
+                  if (webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+              }
+          }
+          JAVA
+
+          cat > app/src/main/assets/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ar" dir="rtl">
+          <head>
+          <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+          <title>برنامج إدارة حمزة</title>
+          <style>
+          :root{--navy:#173d68;--gold:#d6a94f;--bg:#eef3f8;--ink:#10253e;--green:#157347;--red:#c83232}
+          *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,Arial,sans-serif}header{background:var(--navy);color:#fff;padding:18px 16px;border-bottom:4px solid var(--gold);position:sticky;top:0;z-index:5}header small{color:#f4cd7a}h1{margin:4px 0 0;font-size:25px}.wrap{padding:12px;max-width:1000px;margin:auto}.stats,.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat,.panel,.action{background:#fff;border:1px solid #d9e1e9;border-radius:14px;box-shadow:0 3px 12px #173d6810}.stat{padding:12px}.stat span{font-size:12px;color:#62748a}.stat b{display:block;margin-top:6px;font-size:17px}.stat.dark{background:var(--navy);color:#fff}.stat.dark span{color:#f7d98f}.panel{padding:14px;margin-top:13px}.title{display:flex;align-items:center;gap:8px;margin-bottom:12px}.title h2{font-size:18px;margin:0}.action{padding:13px;text-align:right;color:var(--ink);font-family:inherit}.action b{display:block}.action small{color:#697a8d}.formgrid{display:grid;gap:10px}.field label{display:block;font-size:13px;font-weight:bold;margin-bottom:5px}input,select,textarea{width:100%;padding:11px;border:1px solid #b8c5d2;border-radius:10px;background:#fff;font-family:inherit;font-size:15px}textarea{min-height:68px;resize:vertical}.centers{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.center{border:1px solid #c6d0da;border-radius:9px;padding:8px;background:#f8fafc}.center input{width:auto;margin-left:5px}.btn{border:0;border-radius:10px;padding:11px 13px;background:var(--navy);color:#fff;font-family:inherit;font-weight:bold}.btn.alt{background:#fff;color:var(--navy);border:1px solid #9eafc0}.btn.red{background:#fff;color:var(--red);border:1px solid #efb6b6}.btn.green{background:#14834e}.full{width:100%}.rowbtns{display:flex;flex-wrap:wrap;gap:6px}.tablebox{overflow:auto}.shipment,.record{background:#f9fbfd;border:1px solid #d6e0e8;border-radius:12px;padding:11px;margin:8px 0}.shipment .head,.record .head{display:flex;justify-content:space-between;gap:8px;align-items:center}.shipment .nums{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:9px}.shipment .nums div{background:#fff;padding:7px;border-radius:8px;font-size:12px}.shipment .nums b{display:block;font-size:14px;margin-top:3px}.profit{color:var(--green)}.loss{color:var(--red)}.badge{padding:4px 7px;border-radius:99px;font-size:11px;background:#e5edf5}.due{background:#ffeded;color:var(--red)}.paid{background:#e4f4eb;color:var(--green)}.record p{margin:7px 0;font-size:13px}.record .amount{font-size:18px;font-weight:bold}.search{display:grid;grid-template-columns:2fr 1fr;gap:8px}.empty{text-align:center;color:#77899a;padding:22px}.modal{display:none;position:fixed;inset:0;background:#0009;z-index:20;padding:15px;overflow:auto}.modal.show{display:block}.receipt{background:#fff;max-width:700px;margin:20px auto;padding:25px;border:3px solid var(--navy);min-height:520px}.receipt h2{color:var(--navy);border-bottom:3px solid var(--gold);padding-bottom:12px}.receipt table{width:100%;border-collapse:collapse;margin-top:20px}.receipt td,.receipt th{border:1px solid #aaa;padding:11px}.receipt th{background:var(--navy);color:#fff}.note{font-size:12px;color:#65778a}.hidden{display:none!important}@media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr)}.actions{grid-template-columns:repeat(3,1fr)}.formgrid{grid-template-columns:repeat(2,1fr)}}@media print{body>*:not(#receiptModal){display:none!important}#receiptModal{display:block!important;position:absolute;inset:0;background:#fff;padding:0}.receipt{margin:0;border:0}.no-print{display:none!important}}
+          </style>
+          </head>
+          <body>
+          <header><small>فواتير • استلامات • مصروفات</small><h1>برنامج إدارة حمزة</h1></header>
+          <main class="wrap">
+            <section id="stats" class="stats"></section>
+            <section class="panel"><div class="title"><span>🏛️</span><div><h2>حساب الرسوم الحكومية</h2><small>مستقل عن الشحنات</small></div></div><div id="feeStats" class="stats"></div></section>
+            <section class="panel"><div class="title"><span>📦</span><div><h2>ربح كل شحنة</h2><small>وارد الشحنة ناقص مصاريفها</small></div></div><div id="shipments"></div></section>
+            <section class="panel"><div class="title"><span>➕</span><h2>اختار نوع العملية</h2></div><div id="actions" class="actions"></div></section>
+            <section id="entry" class="panel">
+              <div class="title"><span>🧾</span><h2 id="formTitle">فاتورة القطاع الخاص</h2></div>
+              <div class="formgrid">
+                <div class="field"><label>نوع العملية</label><select id="kind" onchange="kindChanged()"></select></div>
+                <div class="field"><label>التاريخ</label><input id="date" type="date"></div>
+                <div id="shipmentField" class="field"><label>رقم الشحنة</label><input id="shipmentNo" list="shipmentList" placeholder="مثال: 142"><datalist id="shipmentList"></datalist></div>
+                <div id="partyField" class="field"><label id="partyLabel">الجهة / المستلم</label><input id="party" placeholder="اكتب الاسم"></div>
+                <div id="driverField" class="field hidden"><label>اسم السائق</label><select id="driver"><option value="علي الأكبر|07716209162">علي الأكبر — 07716209162</option><option value="سجاد باسم|07705742572">سجاد باسم — 07705742572</option></select></div>
+                <div id="centersField" class="field hidden" style="grid-column:1/-1"><label>المراكز المشمولة بالرحلة</label><div id="centers" class="centers"></div></div>
+                <div class="field" style="grid-column:1/-1"><label>التفاصيل</label><textarea id="details" placeholder="اكتب تفاصيل العملية"></textarea></div>
+                <div class="field"><label>المبلغ بالدينار</label><input id="amount" inputmode="numeric" placeholder="0"></div>
+                <div id="paidField" class="field"><label><input id="paid" type="checkbox" style="width:auto"> تم الاستلام من سكاي</label></div>
+              </div>
+              <button class="btn full" style="margin-top:12px" onclick="saveEntry()" id="saveBtn">حفظ وتوليد الفاتورة</button>
+              <button class="btn alt full hidden" style="margin-top:7px" onclick="cancelEdit()" id="cancelBtn">إلغاء التعديل</button>
+            </section>
+            <section class="panel"><div class="title"><span>🔎</span><h2>البحث وكشف الحساب</h2></div><div class="search"><input id="search" oninput="renderRecords()" placeholder="رقم الشحنة أو الجهة أو التفاصيل"><select id="filter" onchange="renderRecords()"></select></div><div class="rowbtns" style="margin-top:10px"><button class="btn alt" onclick="backup()">مشاركة نسخة احتياطية</button><button class="btn alt" onclick="restore()">استرجاع نسخة</button><button class="btn red" onclick="clearAll()">مسح جميع العمليات</button></div></section>
+            <section class="panel"><div class="title"><span>📋</span><h2>الفواتير والحركات</h2></div><div id="records"></div></section>
+            <p class="note" style="text-align:center">البيانات محفوظة على هذا الجهاز فقط — التطبيق يعمل بدون إنترنت</p>
+          </main>
+          <div id="receiptModal" class="modal"><div class="receipt"><div class="no-print rowbtns"><button class="btn" onclick="Android.printPage()">طباعة / حفظ PDF</button><button class="btn alt" onclick="closeReceipt()">إغلاق</button></div><div id="receiptBody"></div></div></div>
+          <script>
+          const K={private:'فاتورة القطاع الخاص',government:'فاتورة القطاع الحكومي',driver:'محاسبة السائق',broker:'تسديد محمد علوان',amer:'تسديد عامر - إخراج',feeReceived:'رسوم مستلمة من سكاي',feePaid:'رسوم مسددة للهيئة',maintenance:'صيانة السيارات'};
+          const privateCenters=['الهولندي','أربيل الدولي','ميديا أربيل','الكوثر','الكفيل','الثقلين','أمل الحياة','الوارث'];
+          const governmentCenters=['مستشفى أمل الوطني','مركز بغداد','مستشفى الموصل'];
+          const money=n=>new Intl.NumberFormat('ar-IQ').format(Number(n)||0)+' د.ع';
+          const today=()=>new Date().toISOString().slice(0,10);
+          const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+          let state=JSON.parse(localStorage.getItem('hamza-native-v1')||'null')||{rows:[],shipments:[{no:'142',date:'2026-08-29',sector:'private'},{no:'76',date:'2026-08-29',sector:'government'}]};
+          let editId=null;
+          const $=id=>document.getElementById(id);
+          const save=()=>{localStorage.setItem('hamza-native-v1',JSON.stringify(state));renderAll()};
+          function init(){ $('date').value=today(); $('kind').innerHTML=Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('filter').innerHTML='<option value="all">كل العمليات</option>'+Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('actions').innerHTML=Object.entries(K).map(([v,l])=>`<button class="action" onclick="choose('${v}')"><b>${l}</b><small>${v==='private'||v==='government'?'إنشاء فاتورة سكاي':'تسجيل العملية وإصدار وصل'}</small></button>`).join(''); kindChanged();renderAll()}
+          function choose(k){$('kind').value=k;kindChanged();$('entry').scrollIntoView({behavior:'smooth'})}
+          function isFee(k){return k==='feeReceived'||k==='feePaid'}
+          function kindChanged(){const k=$('kind').value;$('formTitle').textContent=K[k];$('shipmentField').classList.toggle('hidden',isFee(k));$('centersField').classList.toggle('hidden',!(k==='private'||k==='government'));$('driverField').classList.toggle('hidden',k!=='driver');$('partyField').classList.toggle('hidden',k==='driver'||k==='private'||k==='government');$('paidField').classList.toggle('hidden',!(k==='private'||k==='government'));if(k==='broker'){$('party').value='محمد علوان';$('partyLabel').textContent='اسم المخلّص'}else if(k==='amer'){$('party').value='عامر';$('amount').value='150000';$('details').value='إخراج أسبوعي';$('partyLabel').textContent='اسم المستلم'}else if(k==='feeReceived'){$('party').value='سكاي فارما';$('partyLabel').textContent='الجهة الدافعة'}else if(k==='feePaid'){$('party').value='الهيئة الوطنية';$('partyLabel').textContent='الجهة المستلمة'}else if(k==='maintenance'){$('party').value='';$('partyLabel').textContent='السيارة / الورشة'}else $('partyLabel').textContent='الجهة / المستلم';renderCenters()}
+          function renderCenters(){const k=$('kind').value,list=k==='government'?governmentCenters:privateCenters;$('centers').innerHTML=list.map((c,i)=>`<label class="center"><input type="checkbox" value="${esc(c)}" ${i===0?'checked':''}>${esc(c)}</label>`).join('')}
+          function saveEntry(){const k=$('kind').value,fee=isFee(k),shipment=$('shipmentNo').value.trim(),amount=Number($('amount').value.replace(/\D/g,'')),details=$('details').value.trim();if(!amount||!details||(!fee&&!shipment)){alert('كمّل رقم الشحنة والتفاصيل والمبلغ');return}let party=$('party').value.trim(),phone='';if(k==='driver'){const a=$('driver').value.split('|');party=a[0];phone=a[1]}if(k==='private'||k==='government'){party=[...document.querySelectorAll('#centers input:checked')].map(x=>x.value).join('، ');if(!party){alert('اختار مركز واحد على الأقل');return}}const row={id:editId||Date.now().toString(36)+Math.random().toString(36).slice(2),date:$('date').value,kind:k,party,details,amount,paid:k==='private'||k==='government'?$('paid').checked:true,shipmentNo:fee?'':shipment,phone};if(editId)state.rows=state.rows.map(x=>x.id===editId?row:x);else state.rows.unshift(row);if(shipment&&!state.shipments.some(s=>s.no===shipment))state.shipments.push({no:shipment,date:row.date,sector:k==='government'?'government':'private'});cancelEdit(false);save()}
+          function cancelEdit(scroll=true){editId=null;$('details').value='';$('amount').value='';$('shipmentNo').value='';$('paid').checked=false;$('saveBtn').textContent='حفظ وتوليد الفاتورة';$('cancelBtn').classList.add('hidden');if(scroll)$('entry').scrollIntoView({behavior:'smooth'})}
+          function editRow(id){const r=state.rows.find(x=>x.id===id);if(!r)return;editId=id;$('kind').value=r.kind;kindChanged();$('date').value=r.date;$('shipmentNo').value=r.shipmentNo||'';$('party').value=r.party;$('details').value=r.details;$('amount').value=r.amount;$('paid').checked=r.paid;if(r.kind==='driver')$('driver').value=r.party+'|'+r.phone;if(r.kind==='private'||r.kind==='government'){[...document.querySelectorAll('#centers input')].forEach(x=>x.checked=r.party.split('،').map(v=>v.trim()).includes(x.value))}$('saveBtn').textContent='حفظ التعديل';$('cancelBtn').classList.remove('hidden');$('entry').scrollIntoView({behavior:'smooth'})}
+          function totals(){return state.rows.reduce((t,r)=>{t[r.kind]=(t[r.kind]||0)+r.amount;if((r.kind==='private'||r.kind==='government')&&!r.paid)t.debt+=r.amount;return t},{debt:0})}
+          function renderStats(){const t=totals();$('stats').innerHTML=[['استلام القطاع الخاص',t.private],['استلام القطاع الحكومي',t.government],['تسديد السواق',t.driver],['تسديد محمد علوان',t.broker],['تسديد عامر',t.amer],['صيانة السيارات',t.maintenance],['الديون على سكاي',t.debt]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');const received=t.feeReceived||0,paid=t.feePaid||0,d=received-paid,label=d>0?'إنت مطلوب':d<0?'إنت تطلب سكاي':'الحساب متعادل';$('feeStats').innerHTML=`<div class="stat"><span>مستلم من سكاي</span><b>${money(received)}</b></div><div class="stat"><span>مسدد للهيئة</span><b>${money(paid)}</b></div><div class="stat dark"><span>${label}</span><b>${money(Math.abs(d))}</b></div>`}
+          function shipmentSummary(s){const a=state.rows.filter(r=>r.shipmentNo===s.no),revenue=a.filter(r=>r.kind==='private'||r.kind==='government').reduce((n,r)=>n+r.amount,0),received=a.filter(r=>(r.kind==='private'||r.kind==='government')&&r.paid).reduce((n,r)=>n+r.amount,0),expenses=a.filter(r=>['driver','broker','amer','maintenance'].includes(r.kind)).reduce((n,r)=>n+r.amount,0);return{...s,revenue,expenses,debt:revenue-received,profit:revenue-expenses}}
+          function renderShipments(){$('shipmentList').innerHTML=state.shipments.map(s=>`<option value="${esc(s.no)}">${s.sector==='private'?'خاص':'حكومي'} — ${s.date}</option>`).join('');$('shipments').innerHTML=state.shipments.length?state.shipments.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(shipmentSummary).map(s=>`<article class="shipment"><div class="head"><b>الشحنة #${esc(s.no)} — ${s.sector==='private'?'قطاع خاص':'قطاع حكومي'}</b><button class="btn red" onclick="deleteShipment('${esc(s.no)}')">مسح الشحنة</button></div><small>${s.date}</small><div class="nums"><div>فاتورة سكاي<b>${money(s.revenue)}</b></div><div>المصاريف<b>${money(s.expenses)}</b></div><div>الدين<b class="${s.debt?'loss':'profit'}">${money(s.debt)}</b></div><div>ربح الشحنة<b class="${s.profit>=0?'profit':'loss'}">${money(s.profit)}</b></div></div></article>`).join(''):'<div class="empty">لا توجد شحنات</div>'}
+          function deleteShipment(no){const n=state.rows.filter(r=>r.shipmentNo===no).length;if(confirm(`مسح الشحنة ${no} وكل عملياتها (${n})؟`)){state.rows=state.rows.filter(r=>r.shipmentNo!==no);state.shipments=state.shipments.filter(s=>s.no!==no);save()}}
+          function renderRecords(){const q=$('search').value.trim().toLowerCase(),f=$('filter').value,rows=state.rows.filter(r=>(f==='all'||r.kind===f)&&(!q||(r.party+' '+r.details+' '+r.shipmentNo).toLowerCase().includes(q)));$('records').innerHTML=rows.length?rows.map(r=>`<article class="record"><div class="head"><b>${K[r.kind]}</b><span class="badge ${(r.kind==='private'||r.kind==='government')?(r.paid?'paid':'due'):'paid'}">${(r.kind==='private'||r.kind==='government')?(r.paid?'مستلم':'مطلوب'):'مسدد'}</span></div><p>${esc(r.date)} ${r.shipmentNo?'— الشحنة #'+esc(r.shipmentNo):''}</p><p><b>${esc(r.party)}</b><br>${esc(r.details)}</p><p class="amount">${money(r.amount)}</p><div class="rowbtns"><button class="btn alt" onclick="invoice('${r.id}')">فاتورة</button><button class="btn alt" onclick="editRow('${r.id}')">تعديل</button>${r.kind==='driver'?`<button class="btn green" onclick="whatsapp('${r.id}')">واتساب</button>`:''}<button class="btn red" onclick="deleteRow('${r.id}')">مسح</button></div></article>`).join(''):'<div class="empty">لا توجد نتائج</div>'}
+          function deleteRow(id){if(confirm('متأكد تريد مسح العملية؟')){state.rows=state.rows.filter(r=>r.id!==id);save()}}
+          function whatsapp(id){const r=state.rows.find(x=>x.id===id),phone=(r.phone||'').replace(/^0/,'964'),txt=`السلام عليكم ${r.party}، تسديد السائق للشحنة ${r.shipmentNo}، المبلغ ${money(r.amount)}، ${r.details}`;location.href=`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`}
+          function invoice(id){const r=state.rows.find(x=>x.id===id);$('receiptBody').innerHTML=`<h2>برنامج إدارة حمزة</h2><h3>${K[r.kind]}</h3><p><b>التاريخ:</b> ${esc(r.date)}</p>${r.shipmentNo?`<p><b>رقم الشحنة:</b> ${esc(r.shipmentNo)}</p>`:''}<table><tr><th>الجهة / المستلم</th><th>التفاصيل</th><th>المبلغ</th></tr><tr><td>${esc(r.party)}</td><td>${esc(r.details)}</td><td><b>${money(r.amount)}</b></td></tr></table><p style="margin-top:80px">توقيع المستلم ____________________ &nbsp;&nbsp; توقيع الإدارة ____________________</p>`;$('receiptModal').classList.add('show')}
+          function closeReceipt(){$('receiptModal').classList.remove('show')}
+          function backup(){const data=JSON.stringify({version:1,...state});if(window.Android)Android.shareText(data);else navigator.clipboard.writeText(data)}
+          function restore(){const data=prompt('الصق نص النسخة الاحتياطية هنا');if(!data)return;try{const x=JSON.parse(data);if(!Array.isArray(x.rows)||!Array.isArray(x.shipments))throw 0;if(confirm('استبدال البيانات الحالية؟')){state={rows:x.rows,shipments:x.shipments};save()}}catch(e){alert('النسخة غير صالحة')}}
+          function clearAll(){if(confirm('متأكد تريد مسح جميع العمليات؟')){state.rows=[];state.shipments=[];save()}}
+          function renderAll(){renderStats();renderShipments();renderRecords()}
+          init();
+          </script>
+          </body></html>
+          HTML
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Prepare APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk HamzaManagement.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HamzaManagement-APK
+          path: HamzaManagement.apk
+          retention-days: 30
