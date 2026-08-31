@@ -23,6 +23,25 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
+      - name: Restore permanent signing key
+        uses: actions/cache@v4
+        with:
+          path: signing
+          key: hamza-management-signing-v1
+
+      - name: Create permanent signing key when missing
+        run: |
+          mkdir -p signing
+          if [ ! -f signing/hamza.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore signing/hamza.keystore \
+              -storepass hamza-management-2026 \
+              -alias hamza \
+              -keypass hamza-management-2026 \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Hamza Management, OU=Private App, O=Hamza, L=Baghdad, C=IQ"
+          fi
+
       - name: Create Android application
         run: |
           mkdir -p app/src/main/java/com/hamza/management
@@ -59,8 +78,24 @@ jobs:
                   applicationId = "com.hamza.management"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 1
-                  versionName = "1.0"
+                  versionCode = 2
+                  versionName = "1.1"
+              }
+
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("../signing/hamza.keystore")
+                      storePassword = "hamza-management-2026"
+                      keyAlias = "hamza"
+                      keyPassword = "hamza-management-2026"
+                  }
+              }
+
+              buildTypes {
+                  getByName("release") {
+                      isMinifyEnabled = false
+                      signingConfig = signingConfigs.getByName("release")
+                  }
               }
 
               compileOptions {
@@ -112,8 +147,9 @@ jobs:
               android:width="108dp" android:height="108dp"
               android:viewportWidth="108" android:viewportHeight="108">
               <path android:fillColor="#173D68" android:pathData="M0,0h108v108h-108z"/>
-              <path android:fillColor="#D6A94F" android:pathData="M20,30h68v48h-68z"/>
-              <path android:fillColor="#FFFFFF" android:pathData="M27,38h54v8h-54zM27,52h35v7h-35zM27,65h45v7h-45z"/>
+              <path android:fillColor="#FFFFFF" android:pathData="M54,8A46,46 0,1 0,54,100A46,46 0,1 0,54,8"/>
+              <path android:fillColor="#D6A94F" android:pathData="M54,14A40,40 0,1 0,54,94A40,40 0,1 0,54,14"/>
+              <path android:fillColor="#173D68" android:pathData="M50,45C42,34 43,23 49,16C52,13 56,13 59,16C65,23 66,34 58,45C56,43 52,43 50,45ZM63,55C75,54 84,60 88,69C90,73 88,77 84,79C74,82 64,77 59,67C62,64 63,60 63,55ZM45,55C33,54 24,60 20,69C18,73 20,77 24,79C34,82 44,77 49,67C46,64 45,60 45,55ZM54,48A7,7 0,1 0,54,62A7,7 0,1 0,54,48"/>
           </vector>
           XML
 
@@ -165,11 +201,13 @@ jobs:
               }
 
               public class Bridge {
-                  @JavascriptInterface public void printPage() {
+                  @JavascriptInterface public void printPage(String title) {
                       runOnUiThread(() -> {
+                          String jobTitle = (title == null || title.trim().isEmpty())
+                              ? "برنامج إدارة حمزة" : title.trim();
                           PrintManager manager = (PrintManager) getSystemService(PRINT_SERVICE);
-                          manager.print("فاتورة إدارة حمزة",
-                              webView.createPrintDocumentAdapter("فاتورة إدارة حمزة"),
+                          manager.print(jobTitle,
+                              webView.createPrintDocumentAdapter(jobTitle),
                               new PrintAttributes.Builder().build());
                       });
                   }
@@ -199,12 +237,22 @@ jobs:
           <style>
           :root{--navy:#173d68;--gold:#d6a94f;--bg:#eef3f8;--ink:#10253e;--green:#157347;--red:#c83232}
           *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,Arial,sans-serif}header{background:var(--navy);color:#fff;padding:18px 16px;border-bottom:4px solid var(--gold);position:sticky;top:0;z-index:5}header small{color:#f4cd7a}h1{margin:4px 0 0;font-size:25px}.wrap{padding:12px;max-width:1000px;margin:auto}.stats,.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat,.panel,.action{background:#fff;border:1px solid #d9e1e9;border-radius:14px;box-shadow:0 3px 12px #173d6810}.stat{padding:12px}.stat span{font-size:12px;color:#62748a}.stat b{display:block;margin-top:6px;font-size:17px}.stat.dark{background:var(--navy);color:#fff}.stat.dark span{color:#f7d98f}.panel{padding:14px;margin-top:13px}.title{display:flex;align-items:center;gap:8px;margin-bottom:12px}.title h2{font-size:18px;margin:0}.action{padding:13px;text-align:right;color:var(--ink);font-family:inherit}.action b{display:block}.action small{color:#697a8d}.formgrid{display:grid;gap:10px}.field label{display:block;font-size:13px;font-weight:bold;margin-bottom:5px}input,select,textarea{width:100%;padding:11px;border:1px solid #b8c5d2;border-radius:10px;background:#fff;font-family:inherit;font-size:15px}textarea{min-height:68px;resize:vertical}.centers{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.center{border:1px solid #c6d0da;border-radius:9px;padding:8px;background:#f8fafc}.center input{width:auto;margin-left:5px}.btn{border:0;border-radius:10px;padding:11px 13px;background:var(--navy);color:#fff;font-family:inherit;font-weight:bold}.btn.alt{background:#fff;color:var(--navy);border:1px solid #9eafc0}.btn.red{background:#fff;color:var(--red);border:1px solid #efb6b6}.btn.green{background:#14834e}.full{width:100%}.rowbtns{display:flex;flex-wrap:wrap;gap:6px}.tablebox{overflow:auto}.shipment,.record{background:#f9fbfd;border:1px solid #d6e0e8;border-radius:12px;padding:11px;margin:8px 0}.shipment .head,.record .head{display:flex;justify-content:space-between;gap:8px;align-items:center}.shipment .nums{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:9px}.shipment .nums div{background:#fff;padding:7px;border-radius:8px;font-size:12px}.shipment .nums b{display:block;font-size:14px;margin-top:3px}.profit{color:var(--green)}.loss{color:var(--red)}.badge{padding:4px 7px;border-radius:99px;font-size:11px;background:#e5edf5}.due{background:#ffeded;color:var(--red)}.paid{background:#e4f4eb;color:var(--green)}.record p{margin:7px 0;font-size:13px}.record .amount{font-size:18px;font-weight:bold}.search{display:grid;grid-template-columns:2fr 1fr;gap:8px}.empty{text-align:center;color:#77899a;padding:22px}.modal{display:none;position:fixed;inset:0;background:#0009;z-index:20;padding:15px;overflow:auto}.modal.show{display:block}.receipt{background:#fff;max-width:700px;margin:20px auto;padding:25px;border:3px solid var(--navy);min-height:520px}.receipt h2{color:var(--navy);border-bottom:3px solid var(--gold);padding-bottom:12px}.receipt table{width:100%;border-collapse:collapse;margin-top:20px}.receipt td,.receipt th{border:1px solid #aaa;padding:11px}.receipt th{background:var(--navy);color:#fff}.note{font-size:12px;color:#65778a}.hidden{display:none!important}@media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr)}.actions{grid-template-columns:repeat(3,1fr)}.formgrid{grid-template-columns:repeat(2,1fr)}}@media print{body>*:not(#receiptModal){display:none!important}#receiptModal{display:block!important;position:absolute;inset:0;background:#fff;padding:0}.receipt{margin:0;border:0}.no-print{display:none!important}}
+          .brand{display:flex;align-items:center;gap:12px}.radiation-logo{width:54px;height:54px;flex:0 0 54px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:var(--navy);border:3px solid #fff;font-size:36px;line-height:1}.doc-brand{display:flex;align-items:center;justify-content:center;gap:12px;text-align:right;border-bottom:3px solid var(--gold);padding-bottom:12px;margin-bottom:18px}.doc-brand .radiation-logo{width:62px;height:62px;flex-basis:62px;font-size:42px}.doc-brand h2{border:0!important;padding:0!important;margin:0!important}.doc-brand p{margin:4px 0 0;color:#65778a}.report-grid{display:grid;gap:9px;grid-template-columns:1fr 1fr}.report-grid .wide{grid-column:1/-1}.report-total{background:#edf3f8;border:2px solid var(--navy);padding:12px;border-radius:10px;text-align:center;font-size:18px;margin:15px 0}.report-table{font-size:11px}.report-table td,.report-table th{padding:7px}.report-section{margin-top:24px}.report-section h3{color:var(--navy);border-right:5px solid var(--gold);padding-right:8px}.print-date{color:#65778a;font-size:12px}@media print{.receipt{max-width:none;padding:8mm}.report-table{font-size:9px}.report-table tr{break-inside:avoid}.doc-brand{break-inside:avoid}}
           </style>
           </head>
           <body>
-          <header><small>فواتير • استلامات • مصروفات</small><h1>برنامج إدارة حمزة</h1></header>
+          <header><div class="brand"><span class="radiation-logo">☢</span><div><small>فواتير • استلامات • مصروفات • تقارير</small><h1>برنامج إدارة حمزة</h1></div></div></header>
           <main class="wrap">
             <section id="stats" class="stats"></section>
+            <section class="panel">
+              <div class="title"><span>📄</span><div><h2>التقارير PDF</h2><small>اختار النوع والفترة وشاهد المجموع والتفاصيل</small></div></div>
+              <div class="report-grid">
+                <div class="field wide"><label>نوع التقرير</label><select id="reportType"></select></div>
+                <div class="field"><label>من تاريخ</label><input id="reportFrom" type="date"></div>
+                <div class="field"><label>إلى تاريخ</label><input id="reportTo" type="date"></div>
+              </div>
+              <button class="btn full" style="margin-top:12px" onclick="generateReport()">إنشاء التقرير / حفظ PDF</button>
+            </section>
             <section class="panel"><div class="title"><span>🏛️</span><div><h2>حساب الرسوم الحكومية</h2><small>مستقل عن الشحنات</small></div></div><div id="feeStats" class="stats"></div></section>
             <section class="panel"><div class="title"><span>📦</span><div><h2>ربح كل شحنة</h2><small>وارد الشحنة ناقص مصاريفها</small></div></div><div id="shipments"></div></section>
             <section class="panel"><div class="title"><span>➕</span><h2>اختار نوع العملية</h2></div><div id="actions" class="actions"></div></section>
@@ -228,35 +276,89 @@ jobs:
             <section class="panel"><div class="title"><span>📋</span><h2>الفواتير والحركات</h2></div><div id="records"></div></section>
             <p class="note" style="text-align:center">البيانات محفوظة على هذا الجهاز فقط — التطبيق يعمل بدون إنترنت</p>
           </main>
-          <div id="receiptModal" class="modal"><div class="receipt"><div class="no-print rowbtns"><button class="btn" onclick="Android.printPage()">طباعة / حفظ PDF</button><button class="btn alt" onclick="closeReceipt()">إغلاق</button></div><div id="receiptBody"></div></div></div>
+          <div id="receiptModal" class="modal"><div class="receipt"><div class="no-print rowbtns"><button class="btn" onclick="printPdf()">طباعة / حفظ PDF</button><button class="btn alt" onclick="closeReceipt()">إغلاق</button></div><div id="receiptBody"></div></div></div>
           <script>
-          const K={private:'فاتورة القطاع الخاص',government:'فاتورة القطاع الحكومي',driver:'محاسبة السائق',broker:'تسديد محمد علوان',amer:'تسديد عامر - إخراج',feeReceived:'رسوم مستلمة من سكاي',feePaid:'رسوم مسددة للهيئة',maintenance:'صيانة السيارات'};
+          const K={private:'فاتورة القطاع الخاص',government:'فاتورة القطاع الحكومي',driver:'محاسبة السائق',broker:'تسديد محمد علوان',amer:'تسديد عامر - إخراج',inspection:'كشف الهيئة - القطاع الخاص',feeReceived:'رسوم مستلمة من سكاي',feePaid:'رسوم مسددة للهيئة',maintenance:'صيانة السيارات'};
+          const REPORTS={all:'التقرير الشامل - كل العمليات',authorityExpenses:'جميع مصروفات الهيئة',inspection:'كشف الهيئة',broker:'تسديد محمد علوان',driver:'تسديد السواق',amer:'تسديد عامر',maintenance:'صيانة السيارات',fees:'الرسوم الحكومية',private:'فواتير القطاع الخاص',government:'فواتير القطاع الحكومي'};
           const privateCenters=['الهولندي','أربيل الدولي','ميديا أربيل','الكوثر','الكفيل','الثقلين','أمل الحياة','الوارث'];
           const governmentCenters=['مستشفى أمل الوطني','مركز بغداد','مستشفى الموصل'];
           const money=n=>new Intl.NumberFormat('ar-IQ').format(Number(n)||0)+' د.ع';
           const today=()=>new Date().toISOString().slice(0,10);
           const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
           let state=JSON.parse(localStorage.getItem('hamza-native-v1')||'null')||{rows:[],shipments:[{no:'142',date:'2026-08-29',sector:'private'},{no:'76',date:'2026-08-29',sector:'government'}]};
-          let editId=null;
+          let editId=null,currentPrintTitle='برنامج إدارة حمزة';
           const $=id=>document.getElementById(id);
           const save=()=>{localStorage.setItem('hamza-native-v1',JSON.stringify(state));renderAll()};
-          function init(){ $('date').value=today(); $('kind').innerHTML=Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('filter').innerHTML='<option value="all">كل العمليات</option>'+Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('actions').innerHTML=Object.entries(K).map(([v,l])=>`<button class="action" onclick="choose('${v}')"><b>${l}</b><small>${v==='private'||v==='government'?'إنشاء فاتورة سكاي':'تسجيل العملية وإصدار وصل'}</small></button>`).join(''); kindChanged();renderAll()}
+          function init(){ $('date').value=today();$('reportTo').value=today();$('reportType').innerHTML=Object.entries(REPORTS).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('kind').innerHTML=Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('filter').innerHTML='<option value="all">كل العمليات</option>'+Object.entries(K).map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); $('actions').innerHTML=Object.entries(K).map(([v,l])=>`<button class="action" onclick="choose('${v}')"><b>${l}</b><small>${v==='private'||v==='government'?'إنشاء فاتورة سكاي':'تسجيل العملية وإصدار وصل'}</small></button>`).join(''); kindChanged();renderAll()}
           function choose(k){$('kind').value=k;kindChanged();$('entry').scrollIntoView({behavior:'smooth'})}
           function isFee(k){return k==='feeReceived'||k==='feePaid'}
-          function kindChanged(){const k=$('kind').value;$('formTitle').textContent=K[k];$('shipmentField').classList.toggle('hidden',isFee(k));$('centersField').classList.toggle('hidden',!(k==='private'||k==='government'));$('driverField').classList.toggle('hidden',k!=='driver');$('partyField').classList.toggle('hidden',k==='driver'||k==='private'||k==='government');$('paidField').classList.toggle('hidden',!(k==='private'||k==='government'));if(k==='broker'){$('party').value='محمد علوان';$('partyLabel').textContent='اسم المخلّص'}else if(k==='amer'){$('party').value='عامر';$('amount').value='150000';$('details').value='إخراج أسبوعي';$('partyLabel').textContent='اسم المستلم'}else if(k==='feeReceived'){$('party').value='سكاي فارما';$('partyLabel').textContent='الجهة الدافعة'}else if(k==='feePaid'){$('party').value='الهيئة الوطنية';$('partyLabel').textContent='الجهة المستلمة'}else if(k==='maintenance'){$('party').value='';$('partyLabel').textContent='السيارة / الورشة'}else $('partyLabel').textContent='الجهة / المستلم';renderCenters()}
+          function kindChanged(){
+            const k=$('kind').value;
+            $('formTitle').textContent=K[k];
+            $('shipmentField').classList.toggle('hidden',isFee(k));
+            $('centersField').classList.toggle('hidden',!(k==='private'||k==='government'));
+            $('driverField').classList.toggle('hidden',k!=='driver');
+            $('partyField').classList.toggle('hidden',k==='driver'||k==='private'||k==='government');
+            $('paidField').classList.toggle('hidden',!(k==='private'||k==='government'));
+            if(k==='broker'){$('party').value='محمد علوان';$('partyLabel').textContent='اسم المخلّص'}
+            else if(k==='amer'){$('party').value='عامر';$('amount').value='150000';$('details').value='إخراج أسبوعي';$('partyLabel').textContent='اسم المستلم'}
+            else if(k==='inspection'){$('party').value='الهيئة الوطنية';$('details').value='أجور كشف الهيئة للقطاع الخاص';$('partyLabel').textContent='الجهة المستلمة'}
+            else if(k==='feeReceived'){$('party').value='سكاي فارما';$('partyLabel').textContent='الجهة الدافعة'}
+            else if(k==='feePaid'){$('party').value='الهيئة الوطنية';$('partyLabel').textContent='الجهة المستلمة'}
+            else if(k==='maintenance'){$('party').value='';$('partyLabel').textContent='السيارة / الورشة'}
+            else $('partyLabel').textContent='الجهة / المستلم';
+            renderCenters()
+          }
           function renderCenters(){const k=$('kind').value,list=k==='government'?governmentCenters:privateCenters;$('centers').innerHTML=list.map((c,i)=>`<label class="center"><input type="checkbox" value="${esc(c)}" ${i===0?'checked':''}>${esc(c)}</label>`).join('')}
           function saveEntry(){const k=$('kind').value,fee=isFee(k),shipment=$('shipmentNo').value.trim(),amount=Number($('amount').value.replace(/\D/g,'')),details=$('details').value.trim();if(!amount||!details||(!fee&&!shipment)){alert('كمّل رقم الشحنة والتفاصيل والمبلغ');return}let party=$('party').value.trim(),phone='';if(k==='driver'){const a=$('driver').value.split('|');party=a[0];phone=a[1]}if(k==='private'||k==='government'){party=[...document.querySelectorAll('#centers input:checked')].map(x=>x.value).join('، ');if(!party){alert('اختار مركز واحد على الأقل');return}}const row={id:editId||Date.now().toString(36)+Math.random().toString(36).slice(2),date:$('date').value,kind:k,party,details,amount,paid:k==='private'||k==='government'?$('paid').checked:true,shipmentNo:fee?'':shipment,phone};if(editId)state.rows=state.rows.map(x=>x.id===editId?row:x);else state.rows.unshift(row);if(shipment&&!state.shipments.some(s=>s.no===shipment))state.shipments.push({no:shipment,date:row.date,sector:k==='government'?'government':'private'});cancelEdit(false);save()}
           function cancelEdit(scroll=true){editId=null;$('details').value='';$('amount').value='';$('shipmentNo').value='';$('paid').checked=false;$('saveBtn').textContent='حفظ وتوليد الفاتورة';$('cancelBtn').classList.add('hidden');if(scroll)$('entry').scrollIntoView({behavior:'smooth'})}
           function editRow(id){const r=state.rows.find(x=>x.id===id);if(!r)return;editId=id;$('kind').value=r.kind;kindChanged();$('date').value=r.date;$('shipmentNo').value=r.shipmentNo||'';$('party').value=r.party;$('details').value=r.details;$('amount').value=r.amount;$('paid').checked=r.paid;if(r.kind==='driver')$('driver').value=r.party+'|'+r.phone;if(r.kind==='private'||r.kind==='government'){[...document.querySelectorAll('#centers input')].forEach(x=>x.checked=r.party.split('،').map(v=>v.trim()).includes(x.value))}$('saveBtn').textContent='حفظ التعديل';$('cancelBtn').classList.remove('hidden');$('entry').scrollIntoView({behavior:'smooth'})}
-          function totals(){return state.rows.reduce((t,r)=>{t[r.kind]=(t[r.kind]||0)+r.amount;if((r.kind==='private'||r.kind==='government')&&!r.paid)t.debt+=r.amount;return t},{debt:0})}
-          function renderStats(){const t=totals();$('stats').innerHTML=[['استلام القطاع الخاص',t.private],['استلام القطاع الحكومي',t.government],['تسديد السواق',t.driver],['تسديد محمد علوان',t.broker],['تسديد عامر',t.amer],['صيانة السيارات',t.maintenance],['الديون على سكاي',t.debt]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');const received=t.feeReceived||0,paid=t.feePaid||0,d=received-paid,label=d>0?'إنت مطلوب':d<0?'إنت تطلب سكاي':'الحساب متعادل';$('feeStats').innerHTML=`<div class="stat"><span>مستلم من سكاي</span><b>${money(received)}</b></div><div class="stat"><span>مسدد للهيئة</span><b>${money(paid)}</b></div><div class="stat dark"><span>${label}</span><b>${money(Math.abs(d))}</b></div>`}
-          function shipmentSummary(s){const a=state.rows.filter(r=>r.shipmentNo===s.no),revenue=a.filter(r=>r.kind==='private'||r.kind==='government').reduce((n,r)=>n+r.amount,0),received=a.filter(r=>(r.kind==='private'||r.kind==='government')&&r.paid).reduce((n,r)=>n+r.amount,0),expenses=a.filter(r=>['driver','broker','amer','maintenance'].includes(r.kind)).reduce((n,r)=>n+r.amount,0);return{...s,revenue,expenses,debt:revenue-received,profit:revenue-expenses}}
+          function totals(source=state.rows){return source.reduce((t,r)=>{t[r.kind]=(t[r.kind]||0)+r.amount;if((r.kind==='private'||r.kind==='government')&&!r.paid)t.debt+=r.amount;return t},{debt:0})}
+          function renderStats(){const t=totals();$('stats').innerHTML=[['استلام القطاع الخاص',t.private],['استلام القطاع الحكومي',t.government],['تسديد السواق',t.driver],['تسديد محمد علوان',t.broker],['تسديد عامر',t.amer],['كشف الهيئة',t.inspection],['صيانة السيارات',t.maintenance],['الديون على سكاي',t.debt]].map(x=>`<div class="stat"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');const received=t.feeReceived||0,paid=t.feePaid||0,d=received-paid,label=d>0?'إنت مطلوب':d<0?'إنت تطلب سكاي':'الحساب متعادل';$('feeStats').innerHTML=`<div class="stat"><span>مستلم من سكاي</span><b>${money(received)}</b></div><div class="stat"><span>مسدد للهيئة</span><b>${money(paid)}</b></div><div class="stat dark"><span>${label}</span><b>${money(Math.abs(d))}</b></div>`}
+          function shipmentSummary(s,source=state.rows){const a=source.filter(r=>r.shipmentNo===s.no),revenue=a.filter(r=>r.kind==='private'||r.kind==='government').reduce((n,r)=>n+r.amount,0),received=a.filter(r=>(r.kind==='private'||r.kind==='government')&&r.paid).reduce((n,r)=>n+r.amount,0),expenses=a.filter(r=>['driver','broker','amer','inspection','maintenance'].includes(r.kind)).reduce((n,r)=>n+r.amount,0);return{...s,revenue,expenses,debt:revenue-received,profit:revenue-expenses}}
           function renderShipments(){$('shipmentList').innerHTML=state.shipments.map(s=>`<option value="${esc(s.no)}">${s.sector==='private'?'خاص':'حكومي'} — ${s.date}</option>`).join('');$('shipments').innerHTML=state.shipments.length?state.shipments.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(shipmentSummary).map(s=>`<article class="shipment"><div class="head"><b>الشحنة #${esc(s.no)} — ${s.sector==='private'?'قطاع خاص':'قطاع حكومي'}</b><button class="btn red" onclick="deleteShipment('${esc(s.no)}')">مسح الشحنة</button></div><small>${s.date}</small><div class="nums"><div>فاتورة سكاي<b>${money(s.revenue)}</b></div><div>المصاريف<b>${money(s.expenses)}</b></div><div>الدين<b class="${s.debt?'loss':'profit'}">${money(s.debt)}</b></div><div>ربح الشحنة<b class="${s.profit>=0?'profit':'loss'}">${money(s.profit)}</b></div></div></article>`).join(''):'<div class="empty">لا توجد شحنات</div>'}
           function deleteShipment(no){const n=state.rows.filter(r=>r.shipmentNo===no).length;if(confirm(`مسح الشحنة ${no} وكل عملياتها (${n})؟`)){state.rows=state.rows.filter(r=>r.shipmentNo!==no);state.shipments=state.shipments.filter(s=>s.no!==no);save()}}
           function renderRecords(){const q=$('search').value.trim().toLowerCase(),f=$('filter').value,rows=state.rows.filter(r=>(f==='all'||r.kind===f)&&(!q||(r.party+' '+r.details+' '+r.shipmentNo).toLowerCase().includes(q)));$('records').innerHTML=rows.length?rows.map(r=>`<article class="record"><div class="head"><b>${K[r.kind]}</b><span class="badge ${(r.kind==='private'||r.kind==='government')?(r.paid?'paid':'due'):'paid'}">${(r.kind==='private'||r.kind==='government')?(r.paid?'مستلم':'مطلوب'):'مسدد'}</span></div><p>${esc(r.date)} ${r.shipmentNo?'— الشحنة #'+esc(r.shipmentNo):''}</p><p><b>${esc(r.party)}</b><br>${esc(r.details)}</p><p class="amount">${money(r.amount)}</p><div class="rowbtns"><button class="btn alt" onclick="invoice('${r.id}')">فاتورة</button><button class="btn alt" onclick="editRow('${r.id}')">تعديل</button>${r.kind==='driver'?`<button class="btn green" onclick="whatsapp('${r.id}')">واتساب</button>`:''}<button class="btn red" onclick="deleteRow('${r.id}')">مسح</button></div></article>`).join(''):'<div class="empty">لا توجد نتائج</div>'}
           function deleteRow(id){if(confirm('متأكد تريد مسح العملية؟')){state.rows=state.rows.filter(r=>r.id!==id);save()}}
           function whatsapp(id){const r=state.rows.find(x=>x.id===id),phone=(r.phone||'').replace(/^0/,'964'),txt=`السلام عليكم ${r.party}، تسديد السائق للشحنة ${r.shipmentNo}، المبلغ ${money(r.amount)}، ${r.details}`;location.href=`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`}
-          function invoice(id){const r=state.rows.find(x=>x.id===id);$('receiptBody').innerHTML=`<h2>برنامج إدارة حمزة</h2><h3>${K[r.kind]}</h3><p><b>التاريخ:</b> ${esc(r.date)}</p>${r.shipmentNo?`<p><b>رقم الشحنة:</b> ${esc(r.shipmentNo)}</p>`:''}<table><tr><th>الجهة / المستلم</th><th>التفاصيل</th><th>المبلغ</th></tr><tr><td>${esc(r.party)}</td><td>${esc(r.details)}</td><td><b>${money(r.amount)}</b></td></tr></table><p style="margin-top:80px">توقيع المستلم ____________________ &nbsp;&nbsp; توقيع الإدارة ____________________</p>`;$('receiptModal').classList.add('show')}
+          function docBrand(title,subtitle=''){return `<div class="doc-brand"><span class="radiation-logo">☢</span><div><h2>برنامج إدارة حمزة</h2><p><b>${esc(title)}</b>${subtitle?'<br>'+esc(subtitle):''}</p></div></div>`}
+          function rowStatus(r){if(r.kind==='private'||r.kind==='government')return r.paid?'مستلم':'مطلوب';if(r.kind==='feeReceived')return'مستلم';return'مسدد'}
+          function invoice(id){
+            const r=state.rows.find(x=>x.id===id);if(!r)return;
+            currentPrintTitle=K[r.kind]+' - '+r.date;
+            $('receiptBody').innerHTML=`${docBrand(K[r.kind])}<p><b>التاريخ:</b> ${esc(r.date)}</p>${r.shipmentNo?`<p><b>رقم الشحنة:</b> ${esc(r.shipmentNo)}</p>`:''}<p><b>الحالة:</b> ${rowStatus(r)}</p><table><tr><th>الجهة / المستلم</th><th>التفاصيل</th><th>المبلغ</th></tr><tr><td>${esc(r.party)}</td><td>${esc(r.details)}</td><td><b>${money(r.amount)}</b></td></tr></table><p style="margin-top:80px">توقيع المستلم ____________________ &nbsp;&nbsp; توقيع الإدارة ____________________</p>`;
+            $('receiptModal').classList.add('show')
+          }
+          function reportRows(type,from,to){
+            return state.rows.filter(r=>{
+              if(from&&r.date<from)return false;if(to&&r.date>to)return false;
+              if(type==='all')return true;
+              if(type==='authorityExpenses')return r.kind==='inspection'||r.kind==='feePaid';
+              if(type==='fees')return r.kind==='feeReceived'||r.kind==='feePaid';
+              return r.kind===type
+            }).sort((a,b)=>a.date.localeCompare(b.date)||a.kind.localeCompare(b.kind))
+          }
+          function generateReport(){
+            const type=$('reportType').value,from=$('reportFrom').value,to=$('reportTo').value;
+            if(from&&to&&from>to){alert('تاريخ البداية لازم يكون قبل تاريخ النهاية');return}
+            const rows=reportRows(type,from,to),t=totals(rows),label=REPORTS[type],period=from&&to?`من ${from} إلى ${to}`:from?`من ${from}`:to?`لغاية ${to}`:'جميع التواريخ';
+            const sum=rows.reduce((n,r)=>n+r.amount,0);
+            const summary=Object.keys(K).filter(k=>t[k]).map(k=>`<tr><td>${K[k]}</td><td><b>${money(t[k])}</b></td></tr>`).join('')||'<tr><td colspan="2">لا توجد مبالغ ضمن الفترة</td></tr>';
+            const feeReceived=t.feeReceived||0,feePaid=t.feePaid||0,feeDiff=feeReceived-feePaid;
+            const showFees=type==='all'||type==='fees'||type==='authorityExpenses';
+            let feeHtml=showFees?`<div class="report-section"><h3>حساب الرسوم الحكومية</h3><table><tr><th>مستلم من سكاي</th><th>مسدد للهيئة</th><th>الفرق</th></tr><tr><td>${money(feeReceived)}</td><td>${money(feePaid)}</td><td><b>${feeDiff>0?'إنت مطلوب '+money(feeDiff):feeDiff<0?'إنت تطلب سكاي '+money(Math.abs(feeDiff)):'الحساب متعادل'}</b></td></tr></table></div>`:'';
+            let shipmentHtml='';
+            if(type==='all'){
+              const numbers=[...new Set(rows.filter(r=>r.shipmentNo).map(r=>r.shipmentNo))];
+              const ships=numbers.map(no=>state.shipments.find(s=>s.no===no)||{no,date:(rows.find(r=>r.shipmentNo===no)||{}).date||'',sector:rows.some(r=>r.shipmentNo===no&&r.kind==='government')?'government':'private'}).map(s=>shipmentSummary(s,rows));
+              shipmentHtml=`<div class="report-section"><h3>ربح كل شحنة</h3><table class="report-table"><tr><th>الشحنة</th><th>القطاع</th><th>التاريخ</th><th>فاتورة سكاي</th><th>المصاريف</th><th>الدين</th><th>الربح</th></tr>${ships.length?ships.map(s=>`<tr><td>${esc(s.no)}</td><td>${s.sector==='government'?'حكومي':'خاص'}</td><td>${esc(s.date)}</td><td>${money(s.revenue)}</td><td>${money(s.expenses)}</td><td>${money(s.debt)}</td><td><b>${money(s.profit)}</b></td></tr>`).join(''):'<tr><td colspan="7">لا توجد شحنات ضمن الفترة</td></tr>'}</table></div>`
+            }
+            const details=rows.length?rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(K[r.kind])}</td><td>${r.shipmentNo?esc(r.shipmentNo):'-'}</td><td>${esc(r.party)}</td><td>${esc(r.details)}</td><td>${rowStatus(r)}</td><td><b>${money(r.amount)}</b></td></tr>`).join(''):'<tr><td colspan="7">لا توجد عمليات ضمن الفترة المحددة</td></tr>';
+            currentPrintTitle=label+' - '+period;
+            $('receiptBody').innerHTML=`${docBrand(label,period)}<p class="print-date">تاريخ إنشاء التقرير: ${today()}</p><div class="report-total">عدد العمليات: <b>${rows.length}</b> &nbsp; | &nbsp; مجموع مبالغ التقرير: <b>${money(sum)}</b></div><div class="report-section"><h3>ملخص المبالغ حسب النوع</h3><table><tr><th>نوع العملية</th><th>المجموع</th></tr>${summary}</table></div>${feeHtml}${shipmentHtml}<div class="report-section"><h3>تفاصيل العمليات مع التاريخ</h3><table class="report-table"><tr><th>التاريخ</th><th>النوع</th><th>الشحنة</th><th>الجهة</th><th>التفاصيل</th><th>الحالة</th><th>المبلغ</th></tr>${details}</table></div>`;
+            $('receiptModal').classList.add('show')
+          }
+          function printPdf(){if(window.Android)Android.printPage(currentPrintTitle);else window.print()}
           function closeReceipt(){$('receiptModal').classList.remove('show')}
           function backup(){const data=JSON.stringify({version:1,...state});if(window.Android)Android.shareText(data);else navigator.clipboard.writeText(data)}
           function restore(){const data=prompt('الصق نص النسخة الاحتياطية هنا');if(!data)return;try{const x=JSON.parse(data);if(!Array.isArray(x.rows)||!Array.isArray(x.shipments))throw 0;if(confirm('استبدال البيانات الحالية؟')){state={rows:x.rows,shipments:x.shipments};save()}}catch(e){alert('النسخة غير صالحة')}}
@@ -268,10 +370,10 @@ jobs:
           HTML
 
       - name: Build APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleRelease --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk HamzaManagement.apk
+        run: cp app/build/outputs/apk/release/app-release.apk HamzaManagement.apk
 
       - uses: actions/upload-artifact@v4
         with:
